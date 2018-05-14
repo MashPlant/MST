@@ -5,14 +5,16 @@
 #ifndef MST_FIBHEAP_H
 #define MST_FIBHEAP_H
 
+#include <type_traits>
+#include "MemPool.h"
+
 template<typename K>
 class FibHeap
 {
 public:
-	// The list in stl, or even the list write by myself
-	// can't quite suit the usage, if we pursue speed
+	// The list in stl can't quite suit the usage, if we pursue speed
 	// so here we have a hand written list
-	class Node
+	struct Node
 	{
 		K key;
 		// fib heap part
@@ -59,6 +61,8 @@ public:
 				tail = x;
 			x->next = head;
 			head = x;
+
+			x->prev = nullptr;
 		}
 
 		void splice(Node *src)
@@ -73,14 +77,12 @@ public:
 			tail = src->tail;
 		}
 
-	public:
-		friend FibHeap<K>;
-
 		const K &getKey() const
 		{ return key; }
 	};
 
 private:
+	MemPool<Node> alloc;
 	Node *min;
 	Node *root;
 
@@ -143,13 +145,32 @@ private:
 		}
 	}
 
+	void destroy(Node *x)
+	{
+		// this function is only called when ~FibHeap called
+		// so there's no need to call deallocate
+		// because the whole MemPool is going to destruct
+		for (Node *it = x->head; it; it = it->next)
+			destroy(it);
+		alloc.destroy(x);
+	}
+
 public:
-	FibHeap() : min(nullptr), root(new Node)
+	FibHeap() : min(nullptr), root(alloc.newElem())
 	{}
+
+	// to avoid some dirty work...
+	FibHeap(const FibHeap &) = delete;
+
+	FibHeap(FibHeap &&) = delete;
+
+	FibHeap &operator=(const FibHeap &) = delete;
+
+	FibHeap &operator=(FibHeap &&) = delete;
 
 	Node *push(const K &key)
 	{
-		Node *x = new Node(key);
+		Node *x = alloc.newElem(key);
 		root->push(x);
 		if (!min || key < min->key)
 			min = x;
@@ -165,10 +186,13 @@ public:
 			x->p = nullptr;
 		root->splice(min);
 		root->erase(min);
+		alloc.deallocate(min);
+		if constexpr (!std::is_trivially_destructible_v<Node>)
+			alloc.destroy(min);
 		popFix();
 	}
 
-	bool empty() const
+	bool empty()
 	{ return min == nullptr; }
 
 	void merge(FibHeap &src)
@@ -184,12 +208,15 @@ public:
 		x->key = key;
 		Node *y = x->p;
 		if (y && x->key < y->key)
-		{
-			cut(x);
-			cascadingCut(y);
-		}
+			cut(x), cascadingCut(y);
 		if (x->key < min->key)
 			min = x;
+	}
+
+	~FibHeap()
+	{
+		if constexpr (!std::is_trivially_destructible_v<Node>)
+			destroy(root);
 	}
 };
 

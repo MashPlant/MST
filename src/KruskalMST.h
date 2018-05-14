@@ -18,24 +18,34 @@ class KruskalMST
 		double w;
 
 		bool operator<(const Edge &rhs) const
-		{ return w < rhs.w; }
+		{
+			return w < rhs.w;
+		}
 	};
+
+protected:
+	KruskalMST() = default;
 
 	std::vector<Edge> edges;
 	int n;
+
+	void addEdge(int from, int to, double w)
+	{ edges.push_back({from, to, w}); }
+
 public:
 	KruskalMST(const std::vector<Point2d> &points)
 	{
 		n = static_cast<int>(points.size());
 		for (int i = 0; i < n; ++i)
 			for (int j = i + 1; j < n; ++j)
-				edges.push_back({i, j, (points[i] - points[j]).length()});
+				addEdge(i, j, (points[i] - points[j]).length());
 		std::sort(edges.begin(), edges.end());
 	}
 
-	double operator()()
+	double operator()() const
 	{
 		double ans = 0.0;
+		int need = n;
 		UFS ufs(n);
 		for (auto &edge : edges)
 		{
@@ -43,13 +53,12 @@ public:
 			{
 				ufs.connect(edge.from, edge.to);
 				ans += edge.w;
-				if (--n == 1)
+				if (--need == 1)
 					break;
 			}
 		}
 		return ans;
 	}
-
 };
 
 #endif //MST_KRUSKALMST_H

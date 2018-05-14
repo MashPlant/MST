@@ -11,8 +11,15 @@
 #include <limits>
 #include <type_traits>
 
+template<typename Point>
+struct DefaultCoordinate
+{
+	double operator()(const Point &point, int pos) const
+	{ return point[pos]; }
+};
+
 template<typename Point, int K,
-		typename Coordinate = double (Point::*)(int) const>
+		typename Coordinate = DefaultCoordinate<Point>>
 class KDTree
 {
 	constexpr static double eps = 1e-7;
@@ -35,16 +42,16 @@ class KDTree
 		{
 			double ave = 0.0, tmpVar = 0.0;
 			for (auto i = l; i < r; ++i)
-				ave += (i->*coordinate)(d);
+				ave += coordinate(*i, d);
 			ave /= r - l;
 			for (auto i = l; i < r; ++i)
-				tmpVar += pow((i->*coordinate)(d) - ave, 2);
+				tmpVar += pow(coordinate(*i, d) - ave, 2);
 			if (tmpVar > var)
 				var = tmpVar, split[midIndex] = d;
 		}
 		// split at the dimension just found
 		std::nth_element(l, mid, r, [=](const Point &lhs, const Point &rhs)
-		{ return (lhs.*coordinate)(split[midIndex]) < (rhs.*coordinate)(split[midIndex]); });
+		{ return coordinate(lhs, split[midIndex]) < coordinate(rhs, split[midIndex]); });
 		build(l, mid);
 		build(mid + 1, r);
 	}
@@ -61,12 +68,12 @@ class KDTree
 		// the euclidean distance between pt and current root(pts[mid])
 		double dis2 = 0.0;
 		for (int d = 0; d < K; d++)
-			dis2 += pow((mid->*coordinate)(d) - (pt.*coordinate)(d), 2);
+			dis2 += pow(coordinate(*mid, d) - coordinate(pt, d), 2);
 		if (fabs(dis2) > eps && dis2 < ans)
 			ans = dis2, which = mid;
 		// the euclidean distance between pt and split plane
-		double currOfPt = (pt.*coordinate)(split[midIndex]),
-				currOfMid = (mid->*coordinate)(split[midIndex]);
+		double currOfPt = coordinate(pt, split[midIndex]),
+				currOfMid = coordinate(*mid, split[midIndex]);
 		double r2 = pow(currOfMid - currOfPt, 2);
 		if (currOfPt < currOfMid)
 		{
@@ -93,11 +100,11 @@ class KDTree
 		auto midIndex = mid - first;
 		bool check = true;
 		for (int d = 0; d < K && check; ++d)
-			check &= (mid->*coordinate)(d) >= (pt.*coordinate)(d);
+			check &= coordinate(*mid, d) >= coordinate(pt, d);
 		if (check)
 			return void(found = true);
 		anyGreater(pt, mid + 1, r);
-		if (!found && (pt.*coordinate)(split[midIndex]) <= (mid->*coordinate)(split[midIndex]))
+		if (!found && coordinate(pt, split[midIndex]) <= coordinate(*mid, split[midIndex]))
 			anyGreater(pt, l, mid);
 	}
 
@@ -108,25 +115,26 @@ class KDTree
 		auto midIndex = mid - first;
 		bool check = true;
 		for (int d = 0; d < K && check; ++d)
-			check &= (mid->*coordinate)(d) <= (pt.*coordinate)(d);
+			check &= coordinate(*mid, d) <= coordinate(pt, d);
 		if (check)
 			return void(found = true);
 		anyLess(pt, l, mid);
-		if (!found && (pt.*coordinate)(split[midIndex]) >= (mid->*coordinate)(split[midIndex]))
+		if (!found && coordinate(pt, split[midIndex]) >= coordinate(*mid, split[midIndex]))
 			anyLess(pt, mid + 1, r);
 	}
 
+
 public:
-	KDTree(Point *first, Point *last, Coordinate coordinate = &Point::operator[])
+	KDTree(Point *first, Point *last, Coordinate coordinate = Coordinate())
 			: first(first), last(last), coordinate(coordinate), split(last - first)
 	{
 		build(first, last);
 		for (int d = 0; d < K; ++d)
 		{
 			auto[minPoint, maxPoint] = std::minmax_element(first, last, [=](const Point &lhs, const Point &rhs)
-			{ return (lhs.*coordinate)(d) < (rhs.*coordinate)(d); });
-			min[d] = (const_cast<const Point *>(minPoint)->*coordinate)(d);
-			max[d] = (const_cast<const Point *>(maxPoint)->*coordinate)(d);
+			{ return coordinate(lhs, d) < coordinate(rhs, d); });
+			min[d] = coordinate(const_cast<const Point &>(*minPoint), d);
+			max[d] = coordinate(const_cast<const Point &>(*maxPoint), d);
 		}
 	}
 
@@ -148,7 +156,7 @@ public:
 		bool allEq = true;
 		for (int i = 0; i < K; ++i)
 		{
-			double diff = min[i] - (point.*coordinate)(i);
+			double diff = min[i] - coordinate(point, i);
 			if (diff < 0)
 				return false;
 			else if (diff > 0)
@@ -162,7 +170,7 @@ public:
 		bool allEq = true;
 		for (int i = 0; i < K; ++i)
 		{
-			double diff = (point.*coordinate)(i) - max[i];
+			double diff = coordinate(point, i) - max[i];
 			if (diff < 0)
 				return false;
 			else if (diff > 0)
