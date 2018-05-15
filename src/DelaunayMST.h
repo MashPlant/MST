@@ -92,8 +92,8 @@ class DelaunayMST : public KruskalMST
 	{
 		if (r - l <= 2)
 		{
-			for (int i = l; i < r; i++)
-				for (int j = i + 1; j <= r; j++)
+			for (int i = l; i < r; ++i)
+				for (int j = i + 1; j <= r; ++j)
 					add(i, j);
 			return;
 		}
@@ -104,7 +104,7 @@ class DelaunayMST : public KruskalMST
 			while (tot > 1 && cross(p[stk[tot - 1]], p[stk[tot]], p[i]) < 0)
 				tot--;
 		// find the lowest common tangent for convex hull
-		for (i = 1; i < tot && !ld; i++)
+		for (i = 1; i < tot && !ld; ++i)
 			if (stk[i] <= mid && mid < stk[i + 1])
 				ld = stk[i], rd = stk[i + 1];
 		for (; add(ld, rd), 1;)
@@ -154,7 +154,7 @@ public:
 
 		delaunay(1, n);
 
-		for (int i = 1; i <= n; i++)
+		for (int i = 1; i <= n; ++i)
 			for (int j = last[i]; j; j = e[j].prev)
 				addEdge(ori[i].index - 1, ori[e[j].to].index - 1, (p[i] - p[e[j].to]).length());
 		std::sort(edges.begin(), edges.end());
